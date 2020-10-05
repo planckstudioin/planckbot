@@ -1,0 +1,16 @@
+{
+  "name": "planckbot",
+  "version": "1.0.0",
+  "description": "Social media bot built using selenium",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Yash Gohel <yashgohel16@gmail.com>",
+  "license": "ISC",
+  "dependencies": {
+    "selenium-webdriver": "^4.0.0-alpha.7",
+    "chromedriver": "^85.0.1",
+    "jquery": "^3.5.1"
+  }
+}
