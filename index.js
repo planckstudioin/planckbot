@@ -1,96 +1,61 @@
-require('chromedriver');
-const { Builder, By, until } = require('selenium-webdriver');
-const chrome = require('selenium-webdriver/chrome');
-const chromedriverPath = require('chromedriver').path.replace('app.asar', 'app.asar.unpacked');
-chrome.setDefaultService(new chrome.ServiceBuilder(chromedriverPath).build());
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
 
-let chromeOptions = new chrome.Options;
-chromeOptions.addArguments('disable-infobars');
-chromeOptions.setUserPreferences({ credential_enable_service: false });
+function sleep(seconds) {
+    var waitUntil = new Date().getTime() + seconds * 1000;
+    while (new Date().getTime() < waitUntil) true;
+}
 
-let browser = async function (headless = false) {
+var instagram = async function (headless = false) {
 
-    this.waitTime = 30000;
+    this.driver = await browser(headless);
 
-    if (headless == true) {
-        chromeOptions.addArguments('headless');
+    this.forceLogin = async function (username, password) {
+        let url = 'https://www.instagram.com/accounts/login/';
+        await this.driver.openUrl(url);
+        let inputs = 'form input';
+        var element = await this.driver.getElements('css', inputs);
+
+        await this.driver.type(element[0], username);
+        await this.driver.type(element[1], password + '\n').then(async function () {
+            console.log('Login success');
+        });
     }
 
-    this.driver = await new Builder()
-        .setChromeOptions(chromeOptions)
-        .forBrowser('chrome')
-        .build();
+    this.closeNotificationDialog = async function () {
+        sleep(3);
+        let ele = await this.driver.getElement("css", "button.aOOlW.HoLwm");
+        ele.click();
+    }
 
-    this.quit = async function () {
-        return await this.driver.quit();
-    };
+    this.saveInstagramSession = async function (username, cookie) {
 
-    this.openUrl = async function (url) {
-        return await this.driver.get(url);
-    };
+        let time = Math.round(+new Date() / 1000).toString();
 
-    this.locateElement = async function (type, ele, time = this.waitTime) {
-        var msg = 'Looking for an element';
-        switch (type) {
-            case 'css':
-                await this.driver.wait(until.elementLocated(By.css(ele)), time, msg);
-                break;
-            case 'id':
-                await this.driver.wait(until.elementLocated(By.id(ele)), time, msg);
-                break;
-            case 'name':
-                await this.driver.wait(until.elementLocated(By.name(ele)), time, msg);
-                break;
-            case 'class':
-                await this.driver.wait(until.elementLocated(By.className(ele)), time, msg);
-                break;
-            case 'xpath':
-                await this.driver.wait(until.elementLocated(By.className(ele)), time, msg);
-                break;
+        let userSession = {
+            username: user,
+            password: pass,
+            s_mid: getCookieValue(cookie, 'mid'),
+            s_ig_did: getCookieValue(cookie, 'ig_did'),
+            s_csrftoken: getCookieValue(cookie, 'csrftoken'),
+            s_sessionid: getCookieValue(cookie, 'sessionid'),
+            s_ds_user_id: getCookieValue(cookie, 'ds_user_id'),
+            time: time,
+            status: true
+        }
+
+        if (db.valid('instagram', dbPath)) {
+            db.insertTableContent('instagram', dbPath, userSession, (succ, msg) => {
+                if (succ) {
+                    ipcRenderer.send('is-instagram-connected', true);
+                }
+            })
         }
     }
-
-    this.getElement = async function (type, ele) {
-        await this.locateElement(type, ele);
-        switch (type) {
-            case 'css':
-                return await this.driver.findElement(By.css(ele));
-            case 'id':
-                return await this.driver.findElement(By.id(ele));
-            case 'name':
-                return await this.driver.findElement(By.name(ele));
-            case 'class':
-                return await this.driver.findElement(By.className(ele));
-            case 'xpath':
-                return await this.driver.findElement(By.xpath(ele));
-        }
-    }
-
-    this.getElements = async function (type, ele) {
-        await this.locateElement(type, ele);
-        switch (type) {
-            case 'css':
-                return await this.driver.findElements(By.css(ele));
-            case 'class':
-                return await this.driver.findElements(By.className(ele));
-            case 'xpath':
-                return await this.driver.findElements(By.xpath(ele));
-        }
-    }
-
-    this.type = async function (ele, value) {
-        return await ele.sendKeys(value);
-    }
-
-    this.openUrl = async function (url) {
-        return await this.driver.get(url);
-    }
-
 }
 
 module.exports = {
-    browser
+    browser,
+    instagram
 }
