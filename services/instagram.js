@@ -4,10 +4,17 @@ const fs = require('fs');
 
 class Instagram {
 
+    /**
+     * @param  {boolean} headless=true
+     */
     constructor(headless = true) {
         this.driver = new Browser(headless);
     }
 
+    /**
+     * @param  {string} username
+     * @param  {string} password
+     */
     async forceLogin(username, password) {
         let url = 'https://www.instagram.com/accounts/login/';
         await this.driver.openUrl(url);
@@ -20,6 +27,10 @@ class Instagram {
         });
     }
 
+    /**
+     * @param  {string} username
+     * @param  {string} path='./'
+     */
     async sessionLogin(username, path = './') {
         let sessionFile = this.getInstagramSession(username, path);
         await this.driver.openUrl("https://www.instagram.com/" + sessionFile.username);
@@ -39,6 +50,11 @@ class Instagram {
         await this.driver.openUrl("https://www.instagram.com/");
     }
 
+    /**
+     * @param  {string} username
+     * @param  {string} password
+     * @param  {string} path
+     */
     async normalLogin(username, password, path) {
         let url = 'https://www.instagram.com/accounts/login/';
         await this.driver.openUrl(url);
@@ -56,6 +72,12 @@ class Instagram {
         this.saveInstagramSession(username, cookies, path);
     }
 
+
+    /**
+     * @param  {string} username
+     * @param  {string} password
+     * @param  {string} path='./'
+     */
     async login(username, password, path = './') {
 
         let isSessionSaved = this.checkInstagramSession(username, path);
@@ -73,6 +95,11 @@ class Instagram {
         ele.click();
     }
 
+    /**
+     * @param  {string} username
+     * @param  {object} cookie
+     * @param  {string} path='./'
+     */
     saveInstagramSession(username, cookie, path = './') {
 
         let time = Math.round(+new Date() / 1000).toString();
@@ -93,6 +120,10 @@ class Instagram {
         fs.writeFileSync(sessionPath, data);
     }
 
+    /**
+     * @param  {string} username
+     * @param  {string} path
+     */
     checkInstagramSession(username, path) {
 
         let filepath = path + username + '.json';
@@ -106,12 +137,20 @@ class Instagram {
         }
     }
 
+    /**
+     * @param  {string} username
+     * @param  {string} path
+     * @return {object}
+     */
     getInstagramSession(username, path) {
         let filepath = path + username + '.json';
         let rawdata = fs.readFileSync(filepath);
         return JSON.parse(rawdata);
     }
 
+    /**
+     * @param  {string} username
+     */
     async blockUser(username) {
         await this.driver.openUrl('https://www.instagram.com/' + username + '/');
         this.driver.sleep(3);
@@ -123,6 +162,9 @@ class Instagram {
         btn3[0].click();
     }
 
+    /**
+     * @param  {string} username
+     */
     async unblockUser(username) {
         await this.driver.openUrl('https://www.instagram.com/' + username + '/');
         this.driver.sleep(3);
