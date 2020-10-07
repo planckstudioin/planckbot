@@ -29,7 +29,7 @@ class Browser {
             .forBrowser('chrome')
             .build();
 
-        this.waitTime = 3000;
+        this.waitTime = 15000;
     }
 
     async quit() {
@@ -97,6 +97,14 @@ class Browser {
     async getCookies() {
         let cookies = await this.driver.manage().getCookies();
         return cookies;
+    }
+
+    async removeCookie(name) {
+        await this.driver.manage().deleteCookie(name);
+    }
+
+    async setCookie(value) {
+        await this.driver.manage().addCookie(value);
     }
 
     getCookieValue(cookie, value) {

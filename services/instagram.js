@@ -20,7 +20,26 @@ class Instagram {
         });
     }
 
-    async login(username, password, path = './') {
+    async sessionLogin(username, path = './') {
+        let sessionFile = this.getInstagramSession(username, path);
+        await this.driver.openUrl("https://www.instagram.com/" + sessionFile.username);
+
+        await this.driver.removeCookie('mid');
+        await this.driver.removeCookie('sessionid');
+        await this.driver.removeCookie('ig_did');
+        await this.driver.removeCookie('csrftoken');
+
+        await this.driver.setCookie({ name: 'ig_did', value: sessionFile.ig_did, 'sameSite': 'Strict' });
+        await this.driver.setCookie({ name: 'sessionid', value: sessionFile.sessionid, 'sameSite': 'Strict' });
+        await this.driver.setCookie({ name: 'ds_user_id', value: sessionFile.ds_user_id, 'sameSite': 'Strict' });
+        await this.driver.setCookie({ name: 'mid', value: sessionFile.mid, 'sameSite': 'Strict' });
+        await this.driver.setCookie({ name: 'csrftoken', value: sessionFile.csrftoken, 'sameSite': 'Strict' });
+
+        this.driver.sleep(6);
+        await this.driver.openUrl("https://www.instagram.com/");
+    }
+
+    async normalLogin(username, password, path) {
         let url = 'https://www.instagram.com/accounts/login/';
         await this.driver.openUrl(url);
         let inputs = 'form input';
@@ -37,7 +56,19 @@ class Instagram {
         this.saveInstagramSession(username, cookies, path);
     }
 
+    async login(username, password, path = './') {
+
+        let isSessionSaved = this.checkInstagramSession(username, path);
+
+        if (isSessionSaved) {
+            await this.sessionLogin(username, path);
+        } else {
+            await this.normalLogin(username, password, path);
+        }
+    }
+
     async closeNotificationDialog() {
+        this.driver.sleep(6);
         let ele = await this.driver.getElement("css", "button.aOOlW.HoLwm");
         ele.click();
     }
@@ -61,6 +92,55 @@ class Instagram {
         let sessionPath = path + username + '.json';
         fs.writeFileSync(sessionPath, data);
     }
+
+    checkInstagramSession(username, path) {
+
+        let filepath = path + username + '.json';
+
+        try {
+            if (fs.existsSync(filepath)) {
+                return true;
+            }
+        } catch (err) {
+            console.error(err)
+        }
+    }
+
+    getInstagramSession(username, path) {
+        let filepath = path + username + '.json';
+        let rawdata = fs.readFileSync(filepath);
+        return JSON.parse(rawdata);
+    }
+
+    async blockUser(username) {
+        await this.driver.openUrl('https://www.instagram.com/' + username + '/');
+        this.driver.sleep(3);
+        let btn1 = await this.driver.getElement("css", ".AFWDX>button");
+        btn1.click();
+        let btn2 = await this.driver.getElements("css", "button.aOOlW.-Cab_");
+        btn2[0].click();
+        let btn3 = await this.driver.getElements("css", "button.aOOlW.bIiDR");
+        btn3[0].click();
+    }
+
+    async unblockUser(username) {
+        await this.driver.openUrl('https://www.instagram.com/' + username + '/');
+        this.driver.sleep(3);
+        let btn1 = await this.driver.getElement("css", "span.vBF20._1OSdk>button");
+        btn1.click();
+        let btn2 = await this.driver.getElements("css", "div.mt3GC>button");
+        btn2[0].click();
+    }
+
+    /* Changes required
+    async followUser(username) {
+        await this.driver.openUrl('https://www.instagram.com/' + username + '/');
+        this.driver.sleep(3);
+        let btn = await this.driver.getElements("css", "button");
+        btn[0].click();
+        console.log('User followed/requested');
+    }
+    */
 }
 
 module.exports = Instagram
