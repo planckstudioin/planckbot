@@ -19,6 +19,9 @@ const bot = require('planckbot');
  * @param  {string} username
  * @param  {string} password
  * @param  {string} path='./'
+ * @param  {string} post
+ * @param  {string} comment
+ * @param {string} message
  */
 
 const ig = new bot.Instagram(headless)
@@ -37,6 +40,14 @@ ig.login(username, password, path);
 ig.blockUser(username);
 
 ig.unblockUser(username);
+
+ig.followUser(username);
+
+ig.unfollowUser(username);
+
+ig.comment(post, comment);
+
+ig.sendMessage(username, message);
 
 ```
 

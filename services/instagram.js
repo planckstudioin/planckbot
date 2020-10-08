@@ -174,13 +174,72 @@ class Instagram {
         btn2[0].click();
     }
 
-    /* Changes required
     async followUser(username) {
         await this.driver.openUrl('https://www.instagram.com/' + username + '/');
         this.driver.sleep(3);
         let btn = await this.driver.getElements("css", "button");
-        btn[0].click();
-        console.log('User followed/requested');
+        if(btn[1].getText != 'Requested') {
+            btn[1].click();
+            console.log('User followed/requested');
+        }
+    }
+
+    async unfollowUser(username) {
+        await this.driver.openUrl('https://www.instagram.com/' + username + '/');
+        this.driver.sleep(3);
+        let btn = await this.driver.getElements("css", "button");
+        btn[1].click();
+        let unfollowBtn = await this.driver.getElement("css", ".-Cab_");
+        unfollowBtn.click();
+        console.log('User unfollowed');
+    }
+
+    async comment(post, comment) {
+        await this.driver.openUrl(post);
+        let btn = await this.driver.getElements("css", ".wpO6b");
+        btn[2].click();
+        let textArea = await this.driver.getElement("css", ".X7cDz textarea");
+        await this.driver.type(textArea, comment);
+        let enterBtn = await this.driver.getElement("css", ".X7cDz button");
+        enterBtn.click()   
+    }
+
+    async sendMessage(username, msg) {
+        await this.driver.openUrl('https://www.instagram.com/direct/new/');
+        await this.closeNotificationDialog();
+        let input = await this.driver.getElements("css", "input");
+        await this.driver.type(input[1], username);
+        this.driver.sleep(3);
+        let selectBtn = await this.driver.getElement("css", "button.dCJp8");
+        selectBtn.click();
+        this.driver.sleep(3);
+        let nextBtn = await this.driver.getElement("css", ".rIacr");
+        nextBtn.click();
+        this.driver.sleep(3);
+        let input2 = await this.driver.getElement("css", "textarea");
+        await this.driver.type(input2, msg);
+        let sendBtn = await this.driver.getElements("css", "button");
+        sendBtn[5].click();
+        console.log('Message sent');
+    }
+
+    /* Changes required
+    async sendPost(username, post) {
+        await this.driver.openUrl(post);
+        this.driver.sleep(1);
+        let shareBtn = await this.driver.getElements("css", "button");
+        shareBtn[6].click();
+        this.driver.sleep(1);
+        let directBtn = await this.driver.getElements("css", ".Igw0E.rBNOH.eGOV_");
+        directBtn[1].click();
+        this.driver.sleep(1);
+        let userInput = await this.driver.getElements("css", "input");
+        this.driver.sleep(3);
+        await this.driver.type(userInput[0], username);
+        let selectBtn = await this.driver.getElement("css", "button.dCJp8");
+        selectBtn.click();
+        let sendBtn = await this.driver.getElement("xpath", "//button[contains(text(),'Send')]");
+        sendBtn.click();
     }
     */
 }
