@@ -178,7 +178,7 @@ class Instagram {
         await this.driver.openUrl('https://www.instagram.com/' + username + '/');
         this.driver.sleep(3);
         let btn = await this.driver.getElements("css", "button");
-        if(btn[1].getText != 'Requested') {
+        if (btn[1].getText != 'Requested') {
             btn[1].click();
             console.log('User followed/requested');
         }
@@ -201,7 +201,7 @@ class Instagram {
         let textArea = await this.driver.getElement("css", ".X7cDz textarea");
         await this.driver.type(textArea, comment);
         let enterBtn = await this.driver.getElement("css", ".X7cDz button");
-        enterBtn.click()   
+        enterBtn.click()
     }
 
     async sendMessage(username, msg) {
@@ -223,8 +223,8 @@ class Instagram {
         console.log('Message sent');
     }
 
-    /* Changes required
     async sendPost(username, post) {
+        // Changes requires
         await this.driver.openUrl(post);
         this.driver.sleep(1);
         let shareBtn = await this.driver.getElements("css", "button");
@@ -241,7 +241,24 @@ class Instagram {
         let sendBtn = await this.driver.getElement("xpath", "//button[contains(text(),'Send')]");
         sendBtn.click();
     }
-    */
+
+    async likePost(post) {
+        // TODO
+    }
+
+    async likeHastagPost(hastag, total = 25) {
+        await this.driver.openUrl('https://www.instagram.com/explore/tags/' + hastag);
+        let btn = await this.driver.getElements("css", "div .eLAPa");
+        btn[0].click();
+        for (var i = 0; i < total; i++) {
+            this.driver.sleep(3);
+            let likePost = await this.driver.getElement("css", ".fr66n button");
+            likePost.click();
+            let nextPost = await this.driver.getElement("css", "a.coreSpriteRightPaginationArrow");
+            nextPost.click();
+            this.driver.sleep(3);
+        }
+    }
 }
 
 module.exports = Instagram
