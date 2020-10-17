@@ -32,7 +32,7 @@ class Browser {
             .forBrowser('chrome')
             .build();
 
-        this.waitTime = 15000;
+        this.waitTime = 30000;
     }
 
     async quit() {
@@ -150,6 +150,10 @@ class Browser {
      */
     async setCookie(value) {
         await this.driver.manage().addCookie(value);
+    }
+
+    async waitUntilTitle(title) {
+        await this.driver.wait(until.titleIs(title));
     }
 
     /**

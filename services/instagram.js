@@ -72,6 +72,32 @@ class Instagram {
         this.saveInstagramSession(username, cookies, path);
     }
 
+    /**
+     * @return  {object} session
+     */
+    async userLogin() {
+        let url = 'https://www.instagram.com/accounts/login/';
+
+        this.driver.openUrl(url);
+
+        await this.driver.waitUntilTitle('Instagram');
+        let cookie = await this.driver.getCookies();
+
+        let time = Math.round(+new Date() / 1000).toString();
+
+        let userSession = {
+            type: "instagram",
+            mid: this.driver.getCookieValue(cookie, 'mid'),
+            ig_did: this.driver.getCookieValue(cookie, 'ig_did'),
+            csrftoken: this.driver.getCookieValue(cookie, 'csrftoken'),
+            sessionid: this.driver.getCookieValue(cookie, 'sessionid'),
+            ds_user_id: this.driver.getCookieValue(cookie, 'ds_user_id'),
+            time: time,
+            status: true
+        };
+
+        return userSession;
+    }
 
     /**
      * @param  {string} username
