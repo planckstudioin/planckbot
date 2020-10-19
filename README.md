@@ -1,5 +1,7 @@
 # PlanckBot
 
+## Version 1.0.2
+
 ## Usage
 
 ```js
@@ -17,6 +19,8 @@ const bot = require('planckbot');
  * Common parameters
  * @param  {boolean} headless=true
  * @param  {string} username
+ * @param  {number} userid
+ * @param  {object} cookie
  * @param  {string} password
  * @param  {string} path='./'
  * @param  {string} post
@@ -48,6 +52,12 @@ ig.unfollowUser(username);
 ig.comment(post, comment);
 
 ig.sendMessage(username, message);
+
+ig.getUserInfo(username);
+
+ig.getUserFollowers(userid, cookie);
+
+ig.getUserFollowings(userid, cookie);
 
 ```
 

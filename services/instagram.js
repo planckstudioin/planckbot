@@ -1,8 +1,12 @@
 const Browser = require('./browser.js');
 const Path = require('path');
 const fs = require('fs');
+const fetch = require('node-fetch');
 
 class Instagram {
+
+    followings = [];
+    followers = [];
 
     /**
      * @param  {boolean} headless=true
@@ -284,6 +288,151 @@ class Instagram {
             nextPost.click();
             this.driver.sleep(3);
         }
+    }
+
+    async getUserInfo(username) {
+
+        let url = 'https://www.instagram.com/' + username + '/?__a=1';
+        let userAgent = 'Mozilla/5.0 (Linux; Android 5.0.1; LG-H342 Build/LRX21Y; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/65.0.3325.109 Mobile Safari/537.36 Instagram 40.0.0.14.95 Android (21/5.0.1; 240dpi; 480x786; LGE/lge; LG-H342; c50ds; c50ds; pt_BR; 102221277)';
+
+        let json = await fetch(url, {
+            "headers": {
+                "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9",
+                "accept-language": "en-US,en;q=0.9",
+                "cache-control": "max-age=0",
+                "sec-fetch-dest": "document",
+                "sec-fetch-mode": "navigate",
+                "sec-fetch-site": "none",
+                "sec-fetch-user": "?1",
+                "upgrade-insecure-requests": "1",
+                "User-Agent": userAgent
+            },
+            "referrerPolicy": "strict-origin-when-cross-origin",
+            "body": null,
+            "method": "GET",
+            "mode": "cors"
+        }).then(
+            res => {
+                return res.json();
+            }
+        );
+
+        let info = json.graphql.user;
+        return info;
+    }
+
+    async getUserFollowings(id, cookie, after = '') {
+        let mylist = [];
+
+        let query_hash = 'd04b0a864b4b54837c0d870b0e77e076';
+        let first = 22;
+
+        let queryUrl = 'https://www.instagram.com/graphql/query/?query_hash=' + query_hash + '&variables=';
+        let paramUrl = '{"id":"' + id + '","fetch_mutual": false,"first": ' + first + ',"after":"' + after + '"}';
+
+        paramUrl = paramUrl.replace('{', '%7B');
+        paramUrl = paramUrl.replace('}', '%7D');
+        paramUrl = paramUrl.replace(':', '%3A');
+        paramUrl = paramUrl.replace(',', '%2C');
+
+        let url = queryUrl + paramUrl;
+
+        let json = await fetch(url, {
+            "headers": {
+                "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9",
+                "accept-language": "en-US,en;q=0.9",
+                "cache-control": "max-age=0",
+                "sec-fetch-dest": "document",
+                "sec-fetch-mode": "navigate",
+                "sec-fetch-site": "none",
+                "sec-fetch-user": "?1",
+                "upgrade-insecure-requests": "1",
+                "cookie": cookie
+            },
+            "referrerPolicy": "strict-origin-when-cross-origin",
+            "body": null,
+            "method": "GET",
+            "mode": "cors"
+        }).then(
+            res => {
+                return res.json();
+            }
+        );
+
+        let has_next = json.data.user.edge_follow.page_info.has_next_page;
+        let end_cursor = json.data.user.edge_follow.page_info.end_cursor;
+        let users = json.data.user.edge_follow.edges;
+
+        for (var i = 0; i < users.length; i++) {
+            mylist.push(users[i]);
+        }
+
+        if (has_next) {
+            let next = await this.getUserFollowings(id, cookie, end_cursor);
+            for (var i = 0; i < next.length; i++) {
+                mylist.push(next[i]);
+            }
+        }
+
+        return mylist;
+
+    }
+
+    async getUserFollowers(id, cookie, after = '') {
+        let mylist = [];
+
+        let query_hash = 'c76146de99bb02f6415203be841dd25a';
+        let first = 22;
+
+        let queryUrl = 'https://www.instagram.com/graphql/query/?query_hash=' + query_hash + '&variables=';
+        let paramUrl = '{"id":"' + id + '","fetch_mutual": false,"first": ' + first + ',"after":"' + after + '"}';
+
+        paramUrl = paramUrl.replace('{', '%7B');
+        paramUrl = paramUrl.replace('}', '%7D');
+        paramUrl = paramUrl.replace(':', '%3A');
+        paramUrl = paramUrl.replace(',', '%2C');
+
+        let url = queryUrl + paramUrl;
+
+        let json = await fetch(url, {
+            "headers": {
+                "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9",
+                "accept-language": "en-US,en;q=0.9",
+                "cache-control": "max-age=0",
+                "sec-fetch-dest": "document",
+                "sec-fetch-mode": "navigate",
+                "sec-fetch-site": "none",
+                "sec-fetch-user": "?1",
+                "upgrade-insecure-requests": "1",
+                "cookie": cookie
+            },
+            "referrerPolicy": "strict-origin-when-cross-origin",
+            "body": null,
+            "method": "GET",
+            "mode": "cors"
+        }).then(
+            res => {
+                return res.json();
+            }
+        );
+
+        let has_next = json.data.user.edge_followed_by.page_info.has_next_page;
+        let end_cursor = json.data.user.edge_followed_by.page_info.end_cursor;
+        let users = json.data.user.edge_followed_by.edges;
+
+        for (var i = 0; i < users.length; i++) {
+            mylist.push(users[i]);
+        }
+
+        if (has_next) {
+            let next = await this.getUserFollowers(id, cookie, end_cursor);
+            for (var i = 0; i < next.length; i++) {
+                mylist.push(next[i]);
+            }
+        }
+
+        return mylist;
+
     }
 }
 

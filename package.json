@@ -1,6 +1,6 @@
 {
   "name": "planckbot",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Social media bot built using selenium",
   "main": "index.js",
   "scripts": {
@@ -11,6 +11,7 @@
   "dependencies": {
     "selenium-webdriver": "^4.0.0-alpha.7",
     "chromedriver": "^85.0.1",
-    "jquery": "^3.5.1"
+    "jquery": "^3.5.1",
+    "node-fetch": "^2.6.1"
   }
 }
