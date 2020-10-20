@@ -1,6 +1,6 @@
 # PlanckBot
 
-## Version 1.0.2
+## Version 1.0.3
 
 ## Usage
 
@@ -19,9 +19,13 @@ const bot = require('planckbot');
  * Common parameters
  * @param  {boolean} headless=true
  * @param  {string} username
+ * @param  {number} id
+ * @param  {string} code
  * @param  {number} userid
+ * @param  {string} hashtag
  * @param  {object} cookie
  * @param  {string} password
+ * @param  {number} total
  * @param  {string} path='./'
  * @param  {string} post
  * @param  {string} comment
@@ -58,6 +62,20 @@ ig.getUserInfo(username);
 ig.getUserFollowers(userid, cookie);
 
 ig.getUserFollowings(userid, cookie);
+
+ig.getUserInfo(username);
+
+ig.getPost(code);
+
+ig.getReel(code);
+
+ig.getIgtv(code);
+
+ig.getTopHashtagPost(hashtag);
+
+ig.getHashtagPost(hashtag, total);
+
+ig.getUserPost(userid, total);
 
 ```
 

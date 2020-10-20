@@ -1,6 +1,6 @@
 {
   "name": "planckbot",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Social media bot built using selenium",
   "main": "index.js",
   "scripts": {
