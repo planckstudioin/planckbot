@@ -1,6 +1,6 @@
 {
   "name": "planckbot",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Social media bot built using selenium",
   "main": "index.js",
   "scripts": {
@@ -9,9 +9,9 @@
   "author": "Yash Gohel <yashgohel16@gmail.com>",
   "license": "ISC",
   "dependencies": {
-    "selenium-webdriver": "^4.0.0-alpha.7",
-    "chromedriver": "^85.0.1",
+    "chromedriver": "^88.0.0",
     "jquery": "^3.5.1",
-    "node-fetch": "^2.6.1"
+    "node-fetch": "^2.6.1",
+    "selenium-webdriver": "^4.0.0-alpha.8"
   }
 }

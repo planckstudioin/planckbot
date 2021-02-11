@@ -1,12 +1,12 @@
 # PlanckBot
 
-## Version 1.0.3
+## Version 1.0.4
 
 ## Usage
 
 ```js
 // Import
-const bot = require('planckbot');
+const bot = require("planckbot");
 ```
 
 ## Modules
@@ -14,7 +14,6 @@ const bot = require('planckbot');
 ### Instagram
 
 ```js
-
 /**
  * Common parameters
  * @param  {boolean} headless=true
@@ -32,7 +31,7 @@ const bot = require('planckbot');
  * @param {string} message
  */
 
-const ig = new bot.Instagram(headless)
+const ig = new bot.Instagram(headless);
 
 ig.forceLogin(username, password);
 
@@ -76,12 +75,11 @@ ig.getTopHashtagPost(hashtag);
 ig.getHashtagPost(hashtag, total);
 
 ig.getUserPost(userid, total);
-
 ```
 
 ## Support
 
-Email us:  [support@planckstudio.in](mailto:support@planckstudio.in)
+Email us: [support@planckstudio.in](mailto:support@planckstudio.in)
 
 ### Social media
 

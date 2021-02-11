@@ -506,6 +506,7 @@ class Instagram {
                 mylist.push(next[i]);
             }
         }
+        
         return mylist;
     }
 }
