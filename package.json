@@ -1,17 +1,33 @@
 {
   "name": "planckbot",
-  "version": "1.0.4",
-  "description": "Social media bot built using selenium",
+  "version": "2.0.0",
+  "description": "Lightweight, hardened Instagram and Threads scraping and automation client library",
   "main": "index.js",
+  "files": [
+    "index.js",
+    "lib",
+    "services",
+    ".env.example",
+    "README.md",
+    "CHANGELOG.md"
+  ],
   "scripts": {
-    "test": "node test.js"
+    "test": "node --test test/*.test.js"
   },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "instagram",
+    "threads",
+    "scraper",
+    "automation",
+    "graphql",
+    "meta"
+  ],
   "author": "Yash Gohel <yashgohel16@gmail.com>",
   "license": "ISC",
   "dependencies": {
-    "chromedriver": "^88.0.0",
-    "jquery": "^3.5.1",
-    "node-fetch": "^2.6.1",
-    "selenium-webdriver": "^4.0.0-alpha.8"
+    "dotenv": "^16.4.7"
   }
 }

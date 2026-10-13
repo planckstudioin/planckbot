@@ -1,3 +1,14 @@
-node_modules
-test.js
-tmp
+node_modules/
+.env
+.env.*
+!.env.example
+*.log
+debug.log
+sessions/
+download/
+users.json
+threads_users.json
+*.tmp
+tmp/
+.DS_Store
+Thumbs.db

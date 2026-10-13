@@ -1,7 +1,10 @@
-const instagram = require('./services/instagram.js');
-const browser = require('./services/browser.js');
+const Instagram = require('./services/instagram');
+const Threads = require('./services/threads');
 
 module.exports = {
-    instagram,
-    browser
-}
+    Instagram,
+    Threads,
+    // Lowercase aliases for backward compatibility
+    instagram: Instagram,
+    threads: Threads
+};

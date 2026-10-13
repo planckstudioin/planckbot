@@ -1,514 +1,375 @@
-const Browser = require('./browser.js');
-const Path = require('path');
+/**
+ * Instagram API and Scraping Client for PlanckBot.
+ * Eliminates browser automation in favor of high-performance, hardened REST and GraphQL endpoints.
+ */
+
+const path = require('path');
 const fs = require('fs');
-const fetch = require('node-fetch');
+const { DEFAULT_CONFIG } = require('../lib/config');
+const { shortcodeToId, idToShortcode, sanitizeIdentifier, isNumeric } = require('../lib/utils');
+const Threads = require('./threads');
 
 class Instagram {
-
-    followings = [];
-    followers = [];
-
     /**
-     * @param  {boolean} headless=true
+     * @param {object} [options]
+     * @param {object} [options.headers] - Custom HTTP headers.
+     * @param {object} [options.config] - Custom doc IDs or configurations.
      */
-    constructor(headless = true) {
-        this.driver = new Browser(headless);
-    }
+    constructor(options = {}) {
+        const defaultCfg = DEFAULT_CONFIG.INSTAGRAM;
 
-    /**
-     * @param  {string} username
-     * @param  {string} password
-     */
-    async forceLogin(username, password) {
-        let url = 'https://www.instagram.com/accounts/login/';
-        await this.driver.openUrl(url);
-        let inputs = 'form input';
-        var element = await this.driver.getElements('css', inputs);
-
-        await this.driver.type(element[0], username);
-        await this.driver.type(element[1], password + '\n').then(async function () {
-            console.log('Login success');
-        });
-    }
-
-    /**
-     * @param  {string} username
-     * @param  {string} path='./'
-     */
-    async sessionLogin(username, path = './') {
-        let sessionFile = this.getInstagramSession(username, path);
-        await this.driver.openUrl("https://www.instagram.com/" + sessionFile.username);
-
-        await this.driver.removeCookie('mid');
-        await this.driver.removeCookie('sessionid');
-        await this.driver.removeCookie('ig_did');
-        await this.driver.removeCookie('csrftoken');
-
-        await this.driver.setCookie({ name: 'ig_did', value: sessionFile.ig_did, 'sameSite': 'Strict' });
-        await this.driver.setCookie({ name: 'sessionid', value: sessionFile.sessionid, 'sameSite': 'Strict' });
-        await this.driver.setCookie({ name: 'ds_user_id', value: sessionFile.ds_user_id, 'sameSite': 'Strict' });
-        await this.driver.setCookie({ name: 'mid', value: sessionFile.mid, 'sameSite': 'Strict' });
-        await this.driver.setCookie({ name: 'csrftoken', value: sessionFile.csrftoken, 'sameSite': 'Strict' });
-
-        this.driver.sleep(6);
-        await this.driver.openUrl("https://www.instagram.com/");
-    }
-
-    /**
-     * @param  {string} username
-     * @param  {string} password
-     * @param  {string} path
-     */
-    async normalLogin(username, password, path) {
-        let url = 'https://www.instagram.com/accounts/login/';
-        await this.driver.openUrl(url);
-        let inputs = 'form input';
-        var element = await this.driver.getElements('css', inputs);
-
-        await this.driver.type(element[0], username);
-        await this.driver.type(element[1], password + '\n');
-
-        console.log('Login success');
-        this.driver.sleep(6);
-        await this.driver.openUrl("https://www.instagram.com/" + username + "/");
-
-        let cookies = await this.driver.getCookies();
-        this.saveInstagramSession(username, cookies, path);
-    }
-
-    /**
-     * @return  {object} session
-     */
-    async userLogin() {
-        let url = 'https://www.instagram.com/accounts/login/';
-
-        this.driver.openUrl(url);
-
-        await this.driver.waitUntilTitle('Instagram');
-        let cookie = await this.driver.getCookies();
-
-        let time = Math.round(+new Date() / 1000).toString();
-
-        let userSession = {
-            type: "instagram",
-            mid: this.driver.getCookieValue(cookie, 'mid'),
-            ig_did: this.driver.getCookieValue(cookie, 'ig_did'),
-            csrftoken: this.driver.getCookieValue(cookie, 'csrftoken'),
-            sessionid: this.driver.getCookieValue(cookie, 'sessionid'),
-            ds_user_id: this.driver.getCookieValue(cookie, 'ds_user_id'),
-            time: time,
-            status: true
+        this.headers = {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'User-Agent': defaultCfg.USER_AGENT,
+            'x-csrftoken': defaultCfg.CSRF_TOKEN,
+            'x-ig-app-id': defaultCfg.APP_ID,
+            'x-ig-www-claim': defaultCfg.CLAIM,
+            'Cookie': defaultCfg.COOKIE,
+            'x-instagram-ajax': defaultCfg.AJAX,
+            'accept': '*/*',
+            'accept-language': 'en-US,en;q=0.9',
+            'sec-fetch-site': 'same-origin',
+            'sec-fetch-mode': 'cors',
+            'sec-fetch-dest': 'empty',
+            'x-asbd-id': '198387',
+            ...(options.headers || {})
         };
 
-        return userSession;
+        this.config = {
+            ...defaultCfg.DOC_IDS,
+            ...(options.config || {})
+        };
+
+        this._threadsClient = null;
     }
 
     /**
-     * @param  {string} username
-     * @param  {string} password
-     * @param  {string} path='./'
+     * Lazy-loaded Threads client sharing configuration and credentials.
+     * @returns {Threads}
      */
-    async login(username, password, path = './') {
+    get threads() {
+        if (!this._threadsClient) {
+            this._threadsClient = new Threads({
+                headers: this.headers,
+                config: { docIds: this.config }
+            });
+        }
+        return this._threadsClient;
+    }
 
-        let isSessionSaved = this.checkInstagramSession(username, path);
-
-        if (isSessionSaved) {
-            await this.sessionLogin(username, path);
-        } else {
-            await this.normalLogin(username, password, path);
+    /**
+     * Update client headers.
+     * @param {object} headers
+     */
+    setHeaders(headers) {
+        Object.assign(this.headers, headers);
+        if (this._threadsClient) {
+            this._threadsClient.setHeaders(headers);
         }
     }
 
-    async closeNotificationDialog() {
-        this.driver.sleep(6);
-        let ele = await this.driver.getElement("css", "button.aOOlW.HoLwm");
-        ele.click();
+    /**
+     * Shortcode to ID conversion.
+     * @param {string} shortcode
+     * @returns {string}
+     */
+    shortcodeToId(shortcode) {
+        return shortcodeToId(shortcode);
     }
 
     /**
-     * @param  {string} username
-     * @param  {object} cookie
-     * @param  {string} path='./'
+     * ID to shortcode conversion.
+     * @param {string|number} id
+     * @returns {string}
      */
-    saveInstagramSession(username, cookie, path = './') {
+    idToShortcode(id) {
+        return idToShortcode(id);
+    }
 
-        let time = Math.round(+new Date() / 1000).toString();
+    /**
+     * Internal HTTP request helper.
+     * @private
+     */
+    async _request(url, method = 'GET', body = null, isForm = false) {
+        const headers = { ...this.headers };
+        const options = { method: method.toUpperCase(), headers };
 
-        let userSession = {
-            username: username,
-            mid: this.driver.getCookieValue(cookie, 'mid'),
-            ig_did: this.driver.getCookieValue(cookie, 'ig_did'),
-            csrftoken: this.driver.getCookieValue(cookie, 'csrftoken'),
-            sessionid: this.driver.getCookieValue(cookie, 'sessionid'),
-            ds_user_id: this.driver.getCookieValue(cookie, 'ds_user_id'),
-            time: time,
-            status: true
+        if (body) {
+            if (typeof body === 'object' && !isForm) {
+                headers['Content-Type'] = 'application/json';
+                options.body = JSON.stringify(body);
+            } else if (isForm && typeof body === 'object') {
+                headers['Content-Type'] = 'application/x-www-form-urlencoded';
+                const params = new URLSearchParams();
+                for (const [key, val] of Object.entries(body)) {
+                    params.append(key, typeof val === 'object' ? JSON.stringify(val) : String(val));
+                }
+                options.body = params.toString();
+            } else {
+                options.body = body;
+            }
         }
-
-        let data = JSON.stringify(userSession);
-        let sessionPath = path + username + '.json';
-        fs.writeFileSync(sessionPath, data);
-    }
-
-    /**
-     * @param  {string} username
-     * @param  {string} path
-     */
-    checkInstagramSession(username, path) {
-
-        let filepath = path + username + '.json';
 
         try {
-            if (fs.existsSync(filepath)) {
-                return true;
+            const res = await fetch(url, options);
+            const text = await res.text();
+            try {
+                return JSON.parse(text);
+            } catch (_) {
+                return {
+                    error: 'Non-JSON response received',
+                    statusCode: res.status,
+                    raw: text.slice(0, 500)
+                };
             }
         } catch (err) {
-            console.error(err)
+            return { error: err.message };
         }
     }
 
     /**
-     * @param  {string} username
-     * @param  {string} path
-     * @return {object}
+     * Fetch user profile via web_profile_info.
+     * @param {string} username
      */
-    getInstagramSession(username, path) {
-        let filepath = path + username + '.json';
-        let rawdata = fs.readFileSync(filepath);
-        return JSON.parse(rawdata);
+    async getProfile(username) {
+        const cleanUser = username.replace(/^@/, '').trim();
+        const url = `https://i.instagram.com/api/v1/users/web_profile_info/?username=${encodeURIComponent(cleanUser)}`;
+        return this._request(url, 'GET');
     }
 
     /**
-     * @param  {string} username
+     * Alias for backward compatibility.
+     * @param {string} username
      */
-    async blockUser(username) {
-        await this.driver.openUrl('https://www.instagram.com/' + username + '/');
-        this.driver.sleep(3);
-        let btn1 = await this.driver.getElement("css", ".AFWDX>button");
-        btn1.click();
-        let btn2 = await this.driver.getElements("css", "button.aOOlW.-Cab_");
-        btn2[0].click();
-        let btn3 = await this.driver.getElements("css", "button.aOOlW.bIiDR");
-        btn3[0].click();
-    }
-
-    /**
-     * @param  {string} username
-     */
-    async unblockUser(username) {
-        await this.driver.openUrl('https://www.instagram.com/' + username + '/');
-        this.driver.sleep(3);
-        let btn1 = await this.driver.getElement("css", "span.vBF20._1OSdk>button");
-        btn1.click();
-        let btn2 = await this.driver.getElements("css", "div.mt3GC>button");
-        btn2[0].click();
-    }
-
-    async followUser(username) {
-        await this.driver.openUrl('https://www.instagram.com/' + username + '/');
-        this.driver.sleep(3);
-        let btn = await this.driver.getElements("css", "button");
-        if (btn[1].getText != 'Requested') {
-            btn[1].click();
-            console.log('User followed/requested');
-        }
-    }
-
-    async unfollowUser(username) {
-        await this.driver.openUrl('https://www.instagram.com/' + username + '/');
-        this.driver.sleep(3);
-        let btn = await this.driver.getElements("css", "button");
-        btn[1].click();
-        let unfollowBtn = await this.driver.getElement("css", ".-Cab_");
-        unfollowBtn.click();
-        console.log('User unfollowed');
-    }
-
-    async comment(post, comment) {
-        await this.driver.openUrl(post);
-        let btn = await this.driver.getElements("css", ".wpO6b");
-        btn[2].click();
-        let textArea = await this.driver.getElement("css", ".X7cDz textarea");
-        await this.driver.type(textArea, comment);
-        let enterBtn = await this.driver.getElement("css", ".X7cDz button");
-        enterBtn.click()
-    }
-
-    async sendMessage(username, msg) {
-        await this.driver.openUrl('https://www.instagram.com/direct/new/');
-        await this.closeNotificationDialog();
-        let input = await this.driver.getElements("css", "input");
-        await this.driver.type(input[1], username);
-        this.driver.sleep(3);
-        let selectBtn = await this.driver.getElement("css", "button.dCJp8");
-        selectBtn.click();
-        this.driver.sleep(3);
-        let nextBtn = await this.driver.getElement("css", ".rIacr");
-        nextBtn.click();
-        this.driver.sleep(3);
-        let input2 = await this.driver.getElement("css", "textarea");
-        await this.driver.type(input2, msg);
-        let sendBtn = await this.driver.getElements("css", "button");
-        sendBtn[5].click();
-        console.log('Message sent');
-    }
-
-    async sendPost(username, post) {
-        // Changes requires
-        await this.driver.openUrl(post);
-        this.driver.sleep(1);
-        let shareBtn = await this.driver.getElements("css", "button");
-        shareBtn[6].click();
-        this.driver.sleep(1);
-        let directBtn = await this.driver.getElements("css", ".Igw0E.rBNOH.eGOV_");
-        directBtn[1].click();
-        this.driver.sleep(1);
-        let userInput = await this.driver.getElements("css", "input");
-        this.driver.sleep(3);
-        await this.driver.type(userInput[0], username);
-        let selectBtn = await this.driver.getElement("css", "button.dCJp8");
-        selectBtn.click();
-        let sendBtn = await this.driver.getElement("xpath", "//button[contains(text(),'Send')]");
-        sendBtn.click();
-    }
-
-    async likePost(post) {
-        // TODO
-    }
-
-    async likeHastagPost(hastag, total = 25) {
-        await this.driver.openUrl('https://www.instagram.com/explore/tags/' + hastag);
-        let btn = await this.driver.getElements("css", "div .eLAPa");
-        btn[0].click();
-        for (var i = 0; i < total; i++) {
-            this.driver.sleep(3);
-            let likePost = await this.driver.getElement("css", ".fr66n button");
-            likePost.click();
-            let nextPost = await this.driver.getElement("css", "a.coreSpriteRightPaginationArrow");
-            nextPost.click();
-            this.driver.sleep(3);
-        }
-    }
-
-    async sendFetchRequest(url, cookie = '') {
-        let useragent = 'Mozilla/5.0 (Linux; Android 5.0.1; LG-H342 Build/LRX21Y; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/65.0.3325.109 Mobile Safari/537.36 Instagram 40.0.0.14.95 Android (21/5.0.1; 240dpi; 480x786; LGE/lge; LG-H342; c50ds; c50ds; pt_BR; 102221277)';
-        let json = await fetch(url, {
-            "headers": {
-                "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9",
-                "accept-language": "en-US,en;q=0.9",
-                "cache-control": "max-age=0",
-                "sec-fetch-dest": "document",
-                "sec-fetch-mode": "navigate",
-                "sec-fetch-site": "none",
-                "sec-fetch-user": "?1",
-                "upgrade-insecure-requests": "1",
-                "cookie": cookie,
-                "User-Agent": useragent
-            },
-            "referrerPolicy": "strict-origin-when-cross-origin",
-            "body": null,
-            "method": "GET",
-            "mode": "cors"
-        }).then(
-            res => {
-                return res.json();
-            }
-        );
-        return json;
-    }
-
-    encodeQueryUrl(url) {
-        url = url.replace('{', '%7B');
-        url = url.replace('}', '%7D');
-        url = url.replace(':', '%3A');
-        url = url.replace(',', '%2C');
-        return url;
-    }
-
     async getUserInfo(username) {
-        let url = 'https://www.instagram.com/' + username + '/?__a=1';
-        let json = await this.sendFetchRequest(url);
-        let info = json.graphql.user;
-        return info;
+        const res = await this.getProfile(username);
+        return res?.data?.user || res;
     }
 
-    async getPost(code) {
-        let url = 'https://www.instagram.com/p/' + code + '/?__a=1';
-        let json = await this.sendFetchRequest(url);
-        let post = json.graphql.shortcode_media;
-        return post;
+    /**
+     * Fetch user feed timeline with GraphQL doc_id.
+     * @param {string} username
+     * @param {string} [nextCursor=null]
+     * @param {number} [count=12]
+     */
+    async getUserFeedTimeline(username, nextCursor = null, count = 12) {
+        const docId = this.config.TIMELINE || '30714410208142251';
+        const cleanUser = username.replace(/^@/, '').trim();
+
+        const variables = {
+            after: nextCursor,
+            before: null,
+            data: {
+                count,
+                include_reel_media_seen_timestamp: true,
+                include_relationship_info: true,
+                latest_besties_reel_media: true,
+                latest_reel_media: true
+            },
+            first: count,
+            last: null,
+            username: cleanUser,
+            __relay_internal__pv__PolarisIsLoggedInrelayprovider: true,
+            __relay_internal__pv__PolarisShareSheetV3relayprovider: true
+        };
+
+        const payload = {
+            variables: JSON.stringify(variables),
+            server_timestamps: 'true',
+            doc_id: docId
+        };
+
+        return this._request('https://www.instagram.com/graphql/query', 'POST', payload, true);
     }
 
-    async getReel(code) {
-        let url = 'https://www.instagram.com/reel/' + code + '/?__a=1';
-        let json = await this.sendFetchRequest(url);
-        let reel = json.graphql.shortcode_media;
-        return reel;
+    /**
+     * Fetch user media by GraphQL query.
+     * @param {string} username
+     * @param {string} [nextCursor=null]
+     * @param {number} [count=12]
+     */
+    async getUserMediaByQuery(username, nextCursor = null, count = 12) {
+        const docId = this.config.USER_MEDIA || '10064872980277354';
+        const cleanUser = username.replace(/^@/, '').trim();
+
+        const variables = {
+            after: nextCursor,
+            before: null,
+            data: {
+                count,
+                include_reel_media_seen_timestamp: true,
+                include_relationship_info: true,
+                latest_besties_reel_media: true,
+                latest_reel_media: true
+            },
+            first: count,
+            last: null,
+            username: cleanUser,
+            __relay_internal__pv__PolarisIsLoggedInrelayprovider: true,
+            __relay_internal__pv__PolarisShareSheetV3relayprovider: true
+        };
+
+        const encodedVars = encodeURIComponent(JSON.stringify(variables));
+        const url = `https://www.instagram.com/graphql/query/?variables=${encodedVars}&doc_id=${docId}`;
+        return this._request(url, 'POST');
     }
 
-    async getIgtv(code) {
-        let url = 'https://www.instagram.com/tv/' + code + '/?__a=1';
-        let json = await this.sendFetchRequest(url);
-        let tv = json.graphql.shortcode_media;
-        return tv;
-    }
-
-    async getTopHashtagPost(hashtag) {
-        let url = 'https://www.instagram.com/explore/tags/' + hashtag + '/?__a=1';
-        let json = await this.sendFetchRequest(url);
-        let post = json.graphql.hashtag.edge_hashtag_to_top_posts.edges;
-        return post;
-    }
-
-    /* Changes required
-    async getHashtagStory(hashtag) {
-        let mylist = [];
-
-        let query_hash = 'c9c56db64beb4c9dea2d17740d0259d9';
-
-        let queryUrl = 'https://www.instagram.com/graphql/query/?query_hash=' + query_hash + '&variables=';
-        let paramUrl = '{"include_reel": true,"reel_ids":[],"tag_name":["' + hashtag + '"],"location_ids":[],"precomposed_overlay":false,"stories_video_dash_manifest":false}';
-        let url = queryUrl + this.encodeQueryUrl(paramUrl);
-        console.log(url);
-        let json = await this.sendFetchRequest(url);
-
-        console.log(json);
-
-        let story = json.data.reels_media.items;
-
-        for (var i = 0; i < story.length; i++) {
-            mylist.push(story[i]);
+    /**
+     * Fetch media details by shortcode or numeric media ID.
+     * @param {string} shortcode
+     */
+    async getMedia(shortcode) {
+        let mediaId = shortcode;
+        if (!isNumeric(shortcode)) {
+            // Check if it's a stories URL or standard shortcode
+            if (shortcode.includes('/stories/')) {
+                const parts = shortcode.split('/');
+                if (parts.length > 5) {
+                    mediaId = parts[5];
+                }
+            } else if (shortcode.includes('/p/') || shortcode.includes('/reel/')) {
+                const match = shortcode.match(/\/(p|reel)\/([^/?]+)/);
+                if (match) {
+                    mediaId = this.shortcodeToId(match[2]);
+                }
+            } else {
+                mediaId = this.shortcodeToId(shortcode);
+            }
         }
 
-        return mylist;
+        const url = `https://www.instagram.com/api/v1/media/${mediaId}/info/`;
+        return this._request(url, 'GET');
     }
-    */
 
-    async getHashtagPost(hashtag, total, after = '') {
+    /**
+     * Extract only direct media URLs (.jpg or .mp4) for a post.
+     * @param {string} shortcode
+     * @returns {Promise<string[]>}
+     */
+    async getMediaOnly(shortcode) {
+        const result = await this.getMedia(shortcode);
+        const mediaUrls = [];
 
-        let mylist = [];
+        if (result && Array.isArray(result.items)) {
+            for (const media of result.items) {
+                const mediaType = media.media_type;
 
-        let query_hash = '9b498c08113f1e09617a1703c22b2f32';
-        let first = 50;
-
-        let queryUrl = 'https://www.instagram.com/graphql/query/?query_hash=' + query_hash + '&variables=';
-        let paramUrl = '{"tag_name":"' + hashtag + '","first": ' + first + ',"after":"' + after + '"}';
-
-        let url = queryUrl + this.encodeQueryUrl(paramUrl);
-
-        let json = await this.sendFetchRequest(url);
-
-        let has_next = json.data.hashtag.edge_hashtag_to_media.page_info.has_next_page;
-        let end_cursor = json.data.hashtag.edge_hashtag_to_media.page_info.end_cursor;
-        let media = json.data.hashtag.edge_hashtag_to_media.edges;
-
-        if (mylist.length <= total) {
-            for (var i = 0; i < media.length; i++) {
-                mylist.push(media[i]);
-            }
-            if (has_next) {
-                let newtotal = total - mylist.length;
-                let next = await this.getHashtagPost(hashtag, newtotal, end_cursor);
-                for (var i = 0; i < next.length; i++) {
-                    mylist.push(next[i]);
+                // 1: Photo
+                if (mediaType === 1 && media.image_versions2?.candidates?.length > 0) {
+                    mediaUrls.push(media.image_versions2.candidates[0].url);
+                }
+                // 2: Video
+                else if (mediaType === 2 && media.video_versions?.length > 0) {
+                    mediaUrls.push(media.video_versions[0].url);
+                }
+                // 8: Carousel album
+                else if (mediaType === 8 && Array.isArray(media.carousel_media)) {
+                    for (const item of media.carousel_media) {
+                        if (item.media_type === 1 && item.image_versions2?.candidates?.length > 0) {
+                            mediaUrls.push(item.image_versions2.candidates[0].url);
+                        } else if (item.media_type === 2 && item.video_versions?.length > 0) {
+                            mediaUrls.push(item.video_versions[0].url);
+                        }
+                    }
                 }
             }
         }
-        return mylist;
+
+        return mediaUrls;
     }
 
-    async getUserPost(id, total, after = '') {
-
-        let mylist = [];
-
-        let query_hash = '56a7068fea504063273cc2120ffd54f3';
-        let first = 36;
-
-        let queryUrl = 'https://www.instagram.com/graphql/query/?query_hash=' + query_hash + '&variables=';
-        let paramUrl = '{"id":"' + id + '","first": ' + first + ',"after":"' + after + '"}';
-
-        let url = queryUrl + this.encodeQueryUrl(paramUrl);
-
-        let json = await this.sendFetchRequest(url);
-
-        let has_next = json.data.user.edge_owner_to_timeline_media.page_info.has_next_page;
-        let end_cursor = json.data.user.edge_owner_to_timeline_media.page_info.end_cursor;
-        let media = json.data.user.edge_owner_to_timeline_media.edges;
-
-        if (mylist.length <= total) {
-            for (var i = 0; i < media.length; i++) {
-                mylist.push(media[i]);
-            }
-            if (has_next) {
-                let newtotal = total - mylist.length;
-                let next = await this.getUserPost(id, newtotal, end_cursor);
-                for (var i = 0; i < next.length; i++) {
-                    mylist.push(next[i]);
-                }
-            }
+    /**
+     * Follow a user by username.
+     * @param {string} username
+     */
+    async follow(username) {
+        const profile = await this.getProfile(username);
+        const userId = profile?.data?.user?.id;
+        if (!userId) {
+            return { error: 'Could not retrieve user id from profile' };
         }
-        return mylist;
+        const url = `https://www.instagram.com/api/v1/web/friendships/${userId}/follow/`;
+        return this._request(url, 'POST');
     }
 
-    async getUserFollowings(id, cookie, after = '') {
-        let mylist = [];
-
-        let query_hash = 'd04b0a864b4b54837c0d870b0e77e076';
-        let first = 22;
-
-        let queryUrl = 'https://www.instagram.com/graphql/query/?query_hash=' + query_hash + '&variables=';
-        let paramUrl = '{"id":"' + id + '","fetch_mutual": false,"first": ' + first + ',"after":"' + after + '"}';
-
-        let url = queryUrl + this.encodeQueryUrl(paramUrl);
-
-        let json = await this.sendFetchRequest(url, cookie);
-
-        let has_next = json.data.user.edge_follow.page_info.has_next_page;
-        let end_cursor = json.data.user.edge_follow.page_info.end_cursor;
-        let users = json.data.user.edge_follow.edges;
-
-        for (var i = 0; i < users.length; i++) {
-            mylist.push(users[i]);
+    /**
+     * Unfollow a user by username.
+     * @param {string} username
+     */
+    async unfollow(username) {
+        const profile = await this.getProfile(username);
+        const userId = profile?.data?.user?.id;
+        if (!userId) {
+            return { error: 'Could not retrieve user id from profile' };
         }
-        if (has_next) {
-            let next = await this.getUserFollowings(id, cookie, end_cursor);
-            for (var i = 0; i < next.length; i++) {
-                mylist.push(next[i]);
-            }
-        }
-        return mylist;
+        const url = `https://www.instagram.com/api/v1/web/friendships/${userId}/unfollow/`;
+        return this._request(url, 'POST');
     }
 
-    async getUserFollowers(id, cookie, after = '') {
-        let mylist = [];
-
-        let query_hash = 'c76146de99bb02f6415203be841dd25a';
-        let first = 22;
-
-        let queryUrl = 'https://www.instagram.com/graphql/query/?query_hash=' + query_hash + '&variables=';
-        let paramUrl = '{"id":"' + id + '","fetch_mutual": false,"first": ' + first + ',"after":"' + after + '"}';
-
-        let url = queryUrl + this.encodeQueryUrl(paramUrl);
-
-        let json = await this.sendFetchRequest(url, cookie);
-
-        let has_next = json.data.user.edge_followed_by.page_info.has_next_page;
-        let end_cursor = json.data.user.edge_followed_by.page_info.end_cursor;
-        let users = json.data.user.edge_followed_by.edges;
-
-        for (var i = 0; i < users.length; i++) {
-            mylist.push(users[i]);
+    /**
+     * Get user followers.
+     * @param {string} username
+     * @param {string} [nextCursor='']
+     * @param {number} [count=20]
+     */
+    async getFollowers(username, nextCursor = '', count = 20) {
+        const profile = await this.getProfile(username);
+        const userId = profile?.data?.user?.id;
+        if (!userId) {
+            return { error: 'Could not retrieve user id from profile' };
         }
+        const url = `https://i.instagram.com/api/v1/friendships/${userId}/followers/?count=${count}&max_id=${nextCursor}&search_surface=follow_list_page`;
+        return this._request(url, 'GET');
+    }
 
-        if (has_next) {
-            let next = await this.getUserFollowers(id, cookie, end_cursor);
-            for (var i = 0; i < next.length; i++) {
-                mylist.push(next[i]);
-            }
+    /**
+     * Get user followings.
+     * @param {string} username
+     * @param {string} [nextCursor='']
+     * @param {number} [count=20]
+     */
+    async getFollowings(username, nextCursor = '', count = 20) {
+        const profile = await this.getProfile(username);
+        const userId = profile?.data?.user?.id;
+        if (!userId) {
+            return { error: 'Could not retrieve user id from profile' };
         }
-        
-        return mylist;
+        const url = `https://i.instagram.com/api/v1/friendships/${userId}/following/?count=${count}&max_id=${nextCursor}`;
+        return this._request(url, 'GET');
+    }
+
+    /**
+     * Path-safe session saving preventing directory traversal attacks.
+     * @param {string} username
+     * @param {object} sessionData
+     * @param {string} [baseDir='./sessions']
+     */
+    saveSession(username, sessionData, baseDir = './sessions') {
+        const safeUser = sanitizeIdentifier(username);
+        const resolvedDir = path.resolve(baseDir);
+        if (!fs.existsSync(resolvedDir)) {
+            fs.mkdirSync(resolvedDir, { recursive: true });
+        }
+        const filePath = path.join(resolvedDir, `${safeUser}.json`);
+        fs.writeFileSync(filePath, JSON.stringify(sessionData, null, 2), { encoding: 'utf8', mode: 0o600 });
+        return filePath;
+    }
+
+    /**
+     * Path-safe session loading.
+     * @param {string} username
+     * @param {string} [baseDir='./sessions']
+     * @returns {object|null}
+     */
+    loadSession(username, baseDir = './sessions') {
+        const safeUser = sanitizeIdentifier(username);
+        const filePath = path.join(path.resolve(baseDir), `${safeUser}.json`);
+        if (fs.existsSync(filePath)) {
+            const raw = fs.readFileSync(filePath, 'utf8');
+            return JSON.parse(raw);
+        }
+        return null;
     }
 }
 
-module.exports = Instagram
+module.exports = Instagram;
